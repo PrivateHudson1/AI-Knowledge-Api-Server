@@ -1,0 +1,139 @@
+﻿using ChatBotLamaApi.Interfaces;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
+using System.Security.Claims;
+using System.Text.Json;
+using System.Threading.RateLimiting;
+
+namespace ChatBotLamaApi.Services
+{
+    public class ChatHub : Hub
+    {
+
+        private readonly IRateLimiter _ratelimiter;
+        private readonly ILogger<ChatHub> _logger;
+        private readonly HttpClient _httpClient;
+        private const string LlamaApiUrl = "http://192.168.0.3:8081/completion";
+
+        public ChatHub(HttpClient httpClient, ILogger<ChatHub> logger, IRateLimiter ratelimiter)
+        {
+            _ratelimiter = ratelimiter;
+            _httpClient = httpClient;
+            _logger = logger;
+        }
+
+    
+
+
+        public async Task UpdateRemainingRequests()
+        {
+            var httpContext = Context.GetHttpContext();
+            if (httpContext == null)
+            {
+                _logger.LogInformation("context is null");
+                return;
+            }
+                
+
+            if (!httpContext.Request.Cookies.TryGetValue("user_id", out var userId) || string.IsNullOrEmpty(userId))
+                return;
+
+
+            var remaining = await _ratelimiter.GetRemainingRequestsAsync(userId);
+
+
+            await Clients.Caller.SendAsync("UpdateRemainingRequests", remaining);
+        }
+
+
+        [Authorize]
+        public async Task SendMessage(string message)
+        {
+            var connectionId = Context.ConnectionId;
+            try
+            {
+
+                var prompt = $"<s>[INST] {message} [/INST]";
+
+                var requestData = new
+                {
+                    prompt = prompt,
+                    n_predict = 256,
+                    temperature = 0.7,
+                    top_p = 0.9,
+                    repeat_penalty = 1.1,
+                    stop = new[] { "</s>", "[INST]" },
+                    stream = false
+                };
+
+                var json = JsonSerializer.Serialize(requestData);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync(LlamaApiUrl, content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseJson = await response.Content.ReadAsStringAsync();
+                    using var document = JsonDocument.Parse(responseJson);
+
+                    if (document.RootElement.TryGetProperty("content", out var contentElement))
+                    {
+                        var aiResponse = contentElement.GetString()?.Trim();
+
+                        if(!string.IsNullOrEmpty(aiResponse))
+                        {
+                            var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                            var allowed = await _ratelimiter.TryConsumeRequestAsync(userId);
+                            if (!allowed)
+                            {
+                                await Clients.Caller.SendAsync("ReceiveMessage", "ChatBot", "Your day's attempts are over");
+                                _logger.LogInformation("Request counter is null");
+                                return;
+                            }
+                            await Clients.Caller.SendAsync("ReceiveMessage", "AI", "Thinking...");
+                            await Clients.Caller.SendAsync("ReceiveMessage", "AI", aiResponse);
+                            await UpdateRemainingRequests();
+                            _logger.LogInformation($"AI response sent to {connectionId}");
+                            _logger.LogInformation("Request counter decreased by one");
+                        }
+                        else
+                        {
+                            await Clients.Caller.SendAsync("ReceiveMessage", "AI", "Failed to generate the answer");
+
+
+                        }
+                    }
+                        
+                }
+                else
+                {
+                    _logger.LogError($"Llama APi error: {response.StatusCode}");
+                    await Clients.Caller.SendAsync("ReceiveMessage", "AI", "Network connection error");
+                }
+
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error processing from {connectionId}");
+                await Clients.Caller.SendAsync("ReceiveMessage", "AI", "There was an error when processing a request");
+            }
+          
+        }
+
+
+        public override async Task OnConnectedAsync()
+        {
+            _logger.LogInformation($"Client connected: {Context.ConnectionId}");
+            await UpdateRemainingRequests();
+            await base.OnConnectedAsync();
+        }
+
+        public override async Task OnDisconnectedAsync(Exception? exception)
+        {
+            _logger.LogInformation($"Client disconnected: {Context.ConnectionId}");
+            await base.OnDisconnectedAsync(exception);
+        }
+        
+
+    }
+}
