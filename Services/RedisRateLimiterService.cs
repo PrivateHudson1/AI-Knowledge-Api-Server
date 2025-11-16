@@ -4,13 +4,13 @@ using StackExchange.Redis;
 
 namespace ChatBotLamaApi.Services
 {
-    public class RedisRateLimiter : IRateLimiter
+    public class RedisRateLimiterService : IRateLimiter
     {
         private readonly IConnectionMultiplexer _redis;
-        private readonly ILogger<RedisRateLimiter> _logger;
+        private readonly ILogger<RedisRateLimiterService> _logger;
         private readonly TimeSpan _sessionLifetime = TimeSpan.FromDays(1);
 
-        public RedisRateLimiter(IConnectionMultiplexer redis, ILogger<RedisRateLimiter> logger)
+        public RedisRateLimiterService(IConnectionMultiplexer redis, ILogger<RedisRateLimiterService> logger)
         {
             _redis = redis;
             _logger = logger;

@@ -8,15 +8,15 @@ using System.Threading.RateLimiting;
 
 namespace ChatBotLamaApi.Services
 {
-    public class ChatHub : Hub
+    public class ChatHubService : Hub
     {
 
         private readonly IRateLimiter _ratelimiter;
-        private readonly ILogger<ChatHub> _logger;
+        private readonly ILogger<ChatHubService> _logger;
         private readonly HttpClient _httpClient;
         private const string LlamaApiUrl = "http://192.168.0.3:8081/completion";
 
-        public ChatHub(HttpClient httpClient, ILogger<ChatHub> logger, IRateLimiter ratelimiter)
+        public ChatHubService(HttpClient httpClient, ILogger<ChatHubService> logger, IRateLimiter ratelimiter)
         {
             _ratelimiter = ratelimiter;
             _httpClient = httpClient;

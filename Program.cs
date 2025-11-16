@@ -1,3 +1,4 @@
+using AI_Knowledge_Api.Middleware;
 using ChatBotLamaApi.Handlers;
 using ChatBotLamaApi.Interfaces;
 using ChatBotLamaApi.Services;
@@ -19,7 +20,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHttpClient();
 
-builder.Services.AddHttpClient<ChatHub>(client =>
+builder.Services.AddHttpClient<ChatHubService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(30);
     client.DefaultRequestHeaders.Add("User-Agent", "ChatBotApp");
@@ -38,7 +39,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddSignalR();
 
-builder.Services.AddSingleton<IRateLimiter, RedisRateLimiter>();
+builder.Services.AddSingleton<IRateLimiter, RedisRateLimiterService>();
 
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     ConnectionMultiplexer.Connect(redisHost));
@@ -84,7 +85,7 @@ app.UseAuthorization();
 
 
 
-app.MapHub<ChatHub>("/chatHub");
+app.MapHub<ChatHubService>("/chatHub");
 
 app.MapControllers();
 

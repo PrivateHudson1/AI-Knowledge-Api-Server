@@ -1,6 +1,6 @@
 ﻿using ChatBotLamaApi.Interfaces;
 
-namespace ChatBotLamaApi.Services
+namespace AI_Knowledge_Api.Middleware
 {
     public class UserIdMiddleware
     {
