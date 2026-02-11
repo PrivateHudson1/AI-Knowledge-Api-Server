@@ -8,6 +8,10 @@ using System.Threading.RateLimiting;
 
 namespace ChatBotLamaApi.Services
 {
+
+    //
+    //
+    //
     public class ChatHubService : Hub
     {
 
